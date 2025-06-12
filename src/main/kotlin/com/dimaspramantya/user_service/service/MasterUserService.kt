@@ -1,7 +1,7 @@
 package com.dimaspramantya.user_service.service
 
-import com.dimaspramantya.user_service.domain.dto.request.ReqLoginDto
 import com.dimaspramantya.user_service.domain.dto.request.ReqRegisterDto
+import com.dimaspramantya.user_service.domain.dto.request.ReqLoginDto
 import com.dimaspramantya.user_service.domain.dto.response.ResGetUsersDto
 import com.dimaspramantya.user_service.domain.dto.response.ResLoginDto
 

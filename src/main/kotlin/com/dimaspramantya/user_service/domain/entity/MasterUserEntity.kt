@@ -9,9 +9,17 @@ import java.sql.Timestamp
 @Table(name = "mst_users")
 data class MasterUserEntity(
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    var id: Int,
+    @GeneratedValue(
+        strategy = GenerationType.SEQUENCE,
+        generator = "mst_users_id_seq"
+    )
+    @SequenceGenerator(
+        name = "mst_users_id_seq", // name used in @GeneratedValue
+        sequenceName = "mst_users_id_seq", // name of sequence in DB
+        allocationSize = 1 // adjust based on how your DB increments
+    )
+    @Column(name = "id", insertable = false, updatable = false)
+    var id: Int = 0,
 
     @Column(name = "email")
     var email: String,
