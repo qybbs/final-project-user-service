@@ -14,4 +14,9 @@ interface MasterUserRepository: JpaRepository<MasterUserEntity, Int> {
     fun getAllActiveUser(): List<MasterUserEntity>
     fun findFirstByEmail(email: String): MasterUserEntity?
     fun findFirstByUsername(username: String): Optional<MasterUserEntity>
+    @Query("""
+        SELECT u FROM MasterUserEntity u
+        WHERE u.id IN (:ids)
+    """, nativeQuery = false)
+    fun findAllByIds(ids: List<Int>): List<MasterUserEntity>
 }

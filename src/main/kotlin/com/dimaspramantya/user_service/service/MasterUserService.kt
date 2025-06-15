@@ -9,4 +9,6 @@ interface MasterUserService {
     fun findAllActiveUsers(): List<ResGetUsersDto>
     fun register(req: ReqRegisterDto): ResGetUsersDto
     fun login(req: ReqLoginDto): ResLoginDto
+    fun findById(id: Int): ResGetUsersDto
+    fun findUsersByIds(ids: List<Int>): List<ResGetUsersDto>
 }
