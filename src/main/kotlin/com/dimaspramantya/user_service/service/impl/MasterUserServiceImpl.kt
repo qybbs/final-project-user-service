@@ -119,4 +119,31 @@ class MasterUserServiceImpl(
 
         return ResLoginDto(token)
     }
+
+    override fun findById(id: Int): ResGetUsersDto {
+        val user = masterUserRepository.findById(id).orElseThrow {
+            throw CustomException("User with id ${id} not found!!!", 400)
+        }
+        return ResGetUsersDto(
+            id = user.id,
+            email = user.email,
+            username = user.username,
+            roleId = user.role?.id,
+        )
+    }
+
+    override fun findUsersByIds(
+        ids: List<Int>
+    ): List<ResGetUsersDto> {
+        val rawData = masterUserRepository.findAllByIds(
+            ids
+        )
+        return rawData.map {
+            ResGetUsersDto(
+                id = it.id,
+                username = it.username,
+                email = it.email
+            )
+        }
+    }
 }

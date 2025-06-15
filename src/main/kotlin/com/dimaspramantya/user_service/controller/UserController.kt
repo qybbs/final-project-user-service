@@ -45,6 +45,16 @@ class UserController(
             HttpStatus.CREATED
         )
     }
+    @GetMapping("/{id}")
+    fun getUserById(
+        @PathVariable id: Int
+    ): ResponseEntity<BaseResponse<ResGetUsersDto>>{
+        return ResponseEntity.ok(
+            BaseResponse(
+                data = masterUserService.findById(id)
+            )
+        )
+    }
 
     @PostMapping("/login")
     fun login(
