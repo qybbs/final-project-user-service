@@ -1,7 +1,9 @@
 package com.dimaspramantya.user_service.service.impl
 
+import com.dimaspramantya.user_service.domain.constant.Constant
 import com.dimaspramantya.user_service.domain.dto.request.ReqLoginDto
 import com.dimaspramantya.user_service.domain.dto.request.ReqRegisterDto
+import com.dimaspramantya.user_service.domain.dto.request.ReqUpdateUserDto
 import com.dimaspramantya.user_service.domain.dto.response.ResGetUsersDto
 import com.dimaspramantya.user_service.domain.dto.response.ResLoginDto
 import com.dimaspramantya.user_service.domain.entity.MasterUserEntity
@@ -11,8 +13,8 @@ import com.dimaspramantya.user_service.repository.MasterUserRepository
 import com.dimaspramantya.user_service.service.MasterUserService
 import com.dimaspramantya.user_service.util.BCryptUtil
 import com.dimaspramantya.user_service.util.JwtUtil
+import jakarta.servlet.http.HttpServletRequest
 import org.springframework.http.HttpStatus
-import org.springframework.http.HttpStatusCode
 import org.springframework.stereotype.Service
 import java.util.*
 
@@ -21,7 +23,8 @@ class MasterUserServiceImpl(
     private val masterUserRepository: MasterUserRepository,
     private val masterRoleRepository: MasterRoleRepository,
     private val jwtUtil: JwtUtil,
-    private val bcrypt: BCryptUtil
+    private val bcrypt: BCryptUtil,
+    private val httpServletRequest: HttpServletRequest
 ): MasterUserService {
     override fun findAllActiveUsers(): List<ResGetUsersDto> {
         val rawData = masterUserRepository.getAllActiveUser()
@@ -60,11 +63,7 @@ class MasterUserServiceImpl(
         //cek apakah email sudah terdaftar
         val existingUserEmail = masterUserRepository.findFirstByEmail(req.email)
         if(existingUserEmail != null){
-            try {
-                throw CustomException("Email sudah terdaftar", 400)
-            }catch (e: Exception){
-                println("oops")
-            }
+            throw CustomException("Email sudah terdaftar", 400)
         }
 
         val existingUsername = masterUserRepository
@@ -97,6 +96,7 @@ class MasterUserServiceImpl(
     }
 
     override fun login(req: ReqLoginDto): ResLoginDto {
+        //hasilnya user dengan is_delete false dan is_active true
         val userEntityOpt = masterUserRepository.findFirstByUsername(req.username)
 
         if (userEntityOpt.isEmpty) {
@@ -145,5 +145,49 @@ class MasterUserServiceImpl(
                 email = it.email
             )
         }
+    }
+
+    override fun updateUser(req: ReqUpdateUserDto): ResGetUsersDto {
+        //ambil user id
+        val userId = httpServletRequest.getHeader(Constant.HEADER_USER_ID)
+        println("userId $userId")
+        val user = masterUserRepository.findById(userId.toInt()).orElseThrow {
+            throw CustomException(
+                "User id $userId tidak ditemukan",
+                HttpStatus.BAD_REQUEST.value()
+            )
+        }
+
+        val existingUser = masterUserRepository.findFirstByUsername(req.username)
+        if(existingUser.isPresent){
+            if(existingUser.get().id != user.id){
+                throw CustomException(
+                    "Username telah terdaftar",
+                    HttpStatus.BAD_REQUEST.value()
+                )
+            }
+        }
+
+        val existingUserEmail = masterUserRepository.findFirstByEmail(req.email)
+        if(existingUserEmail != null){
+            if(existingUserEmail.id != user.id){
+                throw CustomException(
+                    "Email telah terdaftar",
+                    HttpStatus.BAD_REQUEST.value()
+                )
+            }
+        }
+
+        user.email = req.email
+        user.username = req.username
+        user.updatedBy = userId
+
+        val result = masterUserRepository.save(user)
+
+        return ResGetUsersDto(
+            id = result.id,
+            username = result.username,
+            email = result.email
+        )
     }
 }
