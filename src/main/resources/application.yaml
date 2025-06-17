@@ -11,6 +11,21 @@ spring:
       hibernate:
         ddl: none
         format_sql: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      client-type: lettuce
+      timeout: 10s
+      connect-timeout: 10s
+      database: 0
+  cache:
+    type: redis
+    redis:
+      use-key-prefix: true
+      key-prefix: "cache:user-service:"
+      cache-null-values: true
+      time-to-live: 600s
 
 server:
   port: 8081

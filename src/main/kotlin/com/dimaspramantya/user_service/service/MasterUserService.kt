@@ -12,5 +12,5 @@ interface MasterUserService {
     fun login(req: ReqLoginDto): ResLoginDto
     fun findById(id: Int): ResGetUsersDto
     fun findUsersByIds(ids: List<Int>): List<ResGetUsersDto>
-    fun updateUser(req: ReqUpdateUserDto): ResGetUsersDto
+    fun updateUser(req: ReqUpdateUserDto, userId: Int): ResGetUsersDto
 }

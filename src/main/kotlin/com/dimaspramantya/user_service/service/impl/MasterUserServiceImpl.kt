@@ -14,6 +14,8 @@ import com.dimaspramantya.user_service.service.MasterUserService
 import com.dimaspramantya.user_service.util.BCryptUtil
 import com.dimaspramantya.user_service.util.JwtUtil
 import jakarta.servlet.http.HttpServletRequest
+import org.springframework.cache.annotation.CacheEvict
+import org.springframework.cache.annotation.Cacheable
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import java.util.*
@@ -120,6 +122,12 @@ class MasterUserServiceImpl(
         return ResLoginDto(token)
     }
 
+    //kalau data belum data di redis bakal disimpan
+    //kalau data di redis udah ada bakal langsung return data dari redis
+    @Cacheable(
+        "getUserById",
+        key = "{#id}"
+    )
     override fun findById(id: Int): ResGetUsersDto {
         val user = masterUserRepository.findById(id).orElseThrow {
             throw CustomException("User with id ${id} not found!!!", 400)
@@ -147,9 +155,14 @@ class MasterUserServiceImpl(
         }
     }
 
-    override fun updateUser(req: ReqUpdateUserDto): ResGetUsersDto {
-        //ambil user id
-        val userId = httpServletRequest.getHeader(Constant.HEADER_USER_ID)
+    @CacheEvict(
+        value = ["getUserById"],
+        key = "{#userId}"
+    )
+    override fun updateUser(
+        req: ReqUpdateUserDto,
+        userId: Int
+    ): ResGetUsersDto {
         println("userId $userId")
         val user = masterUserRepository.findById(userId.toInt()).orElseThrow {
             throw CustomException(
@@ -180,7 +193,7 @@ class MasterUserServiceImpl(
 
         user.email = req.email
         user.username = req.username
-        user.updatedBy = userId
+        user.updatedBy = userId.toString()
 
         val result = masterUserRepository.save(user)
 
