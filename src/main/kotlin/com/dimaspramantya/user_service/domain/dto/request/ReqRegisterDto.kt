@@ -9,5 +9,5 @@ data class ReqRegisterDto(
     val email: String,
     @field:NotBlank(message = "password wajib diisi")
     val password: String,
-    val roleId: Int?
+    val roleId: Int? = null
 )
