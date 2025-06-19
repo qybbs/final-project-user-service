@@ -8,7 +8,7 @@ data class ResGetUsersDto(
     val email: String,
     val username: String,
     var roleId: Int? = null,
-//    var roleName: String? = null
+    var roleName: String? = null
 ): Serializable {
     companion object {
         @Serial

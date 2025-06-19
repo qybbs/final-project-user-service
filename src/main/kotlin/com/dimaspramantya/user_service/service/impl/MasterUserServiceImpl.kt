@@ -3,7 +3,10 @@ package com.dimaspramantya.user_service.service.impl
 import com.dimaspramantya.user_service.domain.constant.Constant
 import com.dimaspramantya.user_service.domain.dto.request.ReqLoginDto
 import com.dimaspramantya.user_service.domain.dto.request.ReqRegisterDto
+import com.dimaspramantya.user_service.domain.dto.request.ReqSetOtpDto
 import com.dimaspramantya.user_service.domain.dto.request.ReqUpdateUserDto
+import com.dimaspramantya.user_service.domain.dto.request.ReqValidateOtpDto
+import com.dimaspramantya.user_service.domain.dto.response.ResGetOtpDto
 import com.dimaspramantya.user_service.domain.dto.response.ResGetUsersDto
 import com.dimaspramantya.user_service.domain.dto.response.ResLoginDto
 import com.dimaspramantya.user_service.domain.entity.MasterUserEntity
@@ -16,8 +19,10 @@ import com.dimaspramantya.user_service.util.JwtUtil
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.cache.annotation.CacheEvict
 import org.springframework.cache.annotation.Cacheable
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
+import java.time.Duration
 import java.util.*
 
 @Service
@@ -26,24 +31,22 @@ class MasterUserServiceImpl(
     private val masterRoleRepository: MasterRoleRepository,
     private val jwtUtil: JwtUtil,
     private val bcrypt: BCryptUtil,
-    private val httpServletRequest: HttpServletRequest
+    private val httpServletRequest: HttpServletRequest,
+    private val stringRedisTemplate: ReactiveStringRedisTemplate
 ): MasterUserService {
     override fun findAllActiveUsers(): List<ResGetUsersDto> {
         val rawData = masterUserRepository.getAllActiveUser()
+
         val result = mutableListOf<ResGetUsersDto>()
-        //GET ALL USER
+
         rawData.forEach { u ->
             result.add(
                 ResGetUsersDto(
                     username = u.username,
                     id = u.id,
                     email = u.email,
-                    //jika user memiliki role maka ambil id role
-                    //jika user tidak memiliki role maka value null
-                    //GET ROLE BY USER.role_id
                     roleId = u.role?.id,
-//                    //jika user memilikie role maka ambil name role
-//                    roleName = u.role?.name
+                    roleName = u.role?.name
                 )
             )
         }
@@ -51,27 +54,23 @@ class MasterUserServiceImpl(
     }
 
     override fun register(req: ReqRegisterDto): ResGetUsersDto {
-        val role = if(req.roleId == null){
-            Optional.empty() //berarti optional.IsEmpty bernilai true
-            //berbeda dengan null
-        }else{
+        val role = if (req.roleId == null) {
+            Optional.empty()
+        } else {
             masterRoleRepository.findById(req.roleId)
         }
-
         if(role.isEmpty && req.roleId != null){
             throw CustomException("Role ${req.roleId} tidak ditemukan", 400)
         }
 
-        //cek apakah email sudah terdaftar
         val existingUserEmail = masterUserRepository.findFirstByEmail(req.email)
-        if(existingUserEmail != null){
+        if (existingUserEmail != null) {
             throw CustomException("Email sudah terdaftar", 400)
         }
 
         val existingUsername = masterUserRepository
             .findFirstByUsername(req.username)
-
-        if(existingUsername.isPresent){
+        if (existingUsername.isPresent) {
             throw CustomException("Username sudah terdaftar", 400)
         }
 
@@ -81,26 +80,26 @@ class MasterUserServiceImpl(
             email = req.email,
             password = hashPw,
             username = req.username,
-            role = if(role.isPresent){
+            role = if (role.isPresent) {
                 role.get()
-            }else{
+            } else {
                 null
             }
         )
-        //entity/row dari hasil save di jadikan sebagi return value
+
         val user = masterUserRepository.save(userRaw)
+
         return ResGetUsersDto(
             id = user.id,
             email = user.email,
             username = user.username,
-            roleId = user.role?.id
+            roleId = user.role?.id,
+            roleName = user.role?.name
         )
     }
 
     override fun login(req: ReqLoginDto): ResLoginDto {
-        //hasilnya user dengan is_delete false dan is_active true
         val userEntityOpt = masterUserRepository.findFirstByUsername(req.username)
-
         if (userEntityOpt.isEmpty) {
             throw CustomException("Username atau Password salah", 400)
         }
@@ -119,19 +118,50 @@ class MasterUserServiceImpl(
 
         val token = jwtUtil.generateToken(userEntity.id, role)
 
-        return ResLoginDto(token)
+        return ResLoginDto(role, token)
     }
 
-    //kalau data belum data di redis bakal disimpan
-    //kalau data di redis udah ada bakal langsung return data dari redis
+    override fun setOtp(req: ReqSetOtpDto): ResGetOtpDto {
+//        val user = masterUserRepository.findById(userId).orElseThrow {
+//            throw CustomException("User with ID $userId not found", 404)
+//        }
+
+        val operationString = stringRedisTemplate.opsForValue()
+
+        operationString.set("user-service:user:otp:${req.userId}", req.otpCode, Duration.ofMinutes(15))
+
+        return ResGetOtpDto(
+            userId = req.userId,
+            otpCode = req.otpCode,
+        )
+    }
+
+    override fun validateOtp(req: ReqValidateOtpDto): String {
+//        val user = masterUserRepository.findById(userId).orElseThrow {
+//            throw CustomException("User with ID $userId not found", 404)
+//        }
+
+        val operationString = stringRedisTemplate.opsForValue()
+
+        val otpCode = operationString.get("user-service:user:otp:${req.userId}")
+            ?: throw CustomException("User with ID ${req.userId} not found in Redis", 404)
+
+        if (!(req.otpCode.equals(otpCode))) {
+            throw CustomException("OTP tidak valid", HttpStatus.FORBIDDEN.value())
+        }
+
+        return "OTP valid, silakan lanjutkan proses selanjutnya"
+    }
+
     @Cacheable(
         "getUserById",
         key = "{#id}"
     )
     override fun findById(id: Int): ResGetUsersDto {
         val user = masterUserRepository.findById(id).orElseThrow {
-            throw CustomException("User with id ${id} not found!!!", 400)
+            throw CustomException("User dengan id ${id} tidak ditemukan!", 400)
         }
+
         return ResGetUsersDto(
             id = user.id,
             email = user.email,
